@@ -18,6 +18,23 @@ int error_count = 0;
 string tokenString, logString;
 bool lastBackSlash, lastAsterisk;
 
+//ofstream logout;
+extern ofstream errorout;
+
+void printError(const string &errorString)
+{
+    error_count++;
+    errorout << "Error at line " << line_count << ": ";
+    errorout << errorString << " " << yytext << "\n\n";
+}
+
+void printLogError(const string &errorString)
+{
+    error_count++;
+    errorout << "Error at line " << line_count << ": ";
+    errorout << errorString << " " << logString << "\n\n";
+}
+
 char getSlashChar(char c)
 {
     if (c=='n') c = '\n';
@@ -81,25 +98,25 @@ NEWLINE \n
 							return CONST_FLOAT;
 						}
 {DECIMAL}"."({DIGIT}|".")*|("."{2,}){DIGIT}({DIGIT}|".")* {
-                            //printError("Too many decimal point");
+                            printError("Too many decimal point");
                         }
 {DECIMAL}{ILLEXPONENT}?|({DIGIT}+{ILLEXPONENT})|{EXPONENT} {
-                            //printError("Ill formed number");
+                            printError("Ill formed number");
                         }
 
 \'[^\n\t\f\r\v\\\"\']\' { return CONST_CHAR; }
 \'\\[^\n\t\f\r\v]\'     { return CONST_CHAR; }
 \'\'                    { 
-							//printError("Empty character constant error");   
+							printError("Empty character constant error");   
 						}
 \'\\\'|\'               { 
-							//printError("Unterminated character");           
+							printError("Unterminated character");           
 						}
 \'[^\n\t\f\r\v\']*/[\n\t\f\r\v<<EOF>>] {
-                          //printError("Unterminated character");
+                          printError("Unterminated character");
                         }
 \'[^\n\t\f\r\v\']{2,}\' {
-                            //printError("Multi character constant error");
+                            printError("Multi character constant error");
                         }
 
 [+-] 					{
@@ -147,7 +164,7 @@ NEWLINE \n
 							return ID;
 						}
 {DIGIT}+{UALPHA}{UALPHANUM}* {
-                            //printError("Invalid prefix on ID or invalid suffix on Number");
+                            printError("Invalid prefix on ID or invalid suffix on Number");
                         }
 
 \"                      {
@@ -177,7 +194,7 @@ NEWLINE \n
                         }
 <INSIDE_STRING>[\n<<EOF>>] {
                             if (yytext[0]=='\n') tmp_line_count++;
-                            //printLogError("Unterminated String");
+                            printLogError("Unterminated String");
                             line_count += tmp_line_count;
                             BEGIN(INITIAL);
                         }
@@ -240,13 +257,13 @@ NEWLINE \n
                             }
                         }
 <INSIDE_MULTI_LINE_COMMENT><<EOF>> {
-                            //printLogError("Unterminated comment");
+                            printLogError("Unterminated comment");
                             line_count += tmp_line_count;
                             BEGIN(INITIAL);
                         }
 
 .                       {
-                            //printError("Unrecognized character found");
+                            printError("Unrecognized character found");
                         }
 %%
 
