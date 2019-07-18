@@ -20,6 +20,15 @@ void yyerror(char *s)
 	//write your code
 }
 
+SymbolInfo *handleRule(string LHS, string RHS, string total)
+{
+	logout << "At line no: " << line_count << " " << LHS << " : " << RHS << "\n\n";
+	logout << total << "\n\n";
+	return new SymbolInfo(total, LHS);
+}
+
+#define ONE_PART { }
+
 %}
 
 %union {
@@ -41,8 +50,8 @@ SymbolInfo* info;
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE
 
-%start start
-
+//%start start
+%start expression_statement
 %%
 
 start : program
@@ -109,55 +118,165 @@ statement : var_declaration
 	  | RETURN expression SEMICOLON
 	  ;
 	  
-expression_statement 	: SEMICOLON			
-			| expression SEMICOLON 
-			;
+expression_statement : SEMICOLON {
+			$<info>$ = handleRule("expression_statement", 
+			"SEMICOLON", 
+			";");		
+		}
+		| expression SEMICOLON {
+			$<info>$ = handleRule("expression_statement", 
+			"expression SEMICOLON", 
+			$<info>1->getName() + ";");
+		}
+		;
 	  
-variable : ID 		
-	 | ID LTHIRD expression RTHIRD 
-	 ;
+variable : ID {
+			$<info>$ = handleRule("variable", 
+			"ID", 
+			$<info>1->getName());		
+		}
+	 	| ID LTHIRD expression RTHIRD {
+			$<info>$ = handleRule("variable", 
+			"ID LTHIRD expression RTHIRD", 
+			$<info>1->getName() + "[" + 
+			$<info>3->getName() + "]");
+		}
+	 	;
 	 
- expression : logic_expression	
-	   | variable ASSIGNOP logic_expression 	
-	   ;
+expression : logic_expression {
+			$<info>$ = handleRule("expression", 
+			"logic_expression", 
+			$<info>1->getName());		
+		}
+	   	| variable ASSIGNOP logic_expression {
+			$<info>$ = handleRule("expression", 
+			"variable ASSIGNOP logic_expression", 
+			$<info>1->getName() + "=" + $<info>3->getName());
+		}
+	   	;
 			
-logic_expression : rel_expression 	
-		 | rel_expression LOGICOP rel_expression 	
-		 ;
+logic_expression : rel_expression {
+			$<info>$ = handleRule("logic_expression", 
+			"rel_expression", 
+			$<info>1->getName());		
+		}	
+		| rel_expression LOGICOP rel_expression {
+			$<info>$ = handleRule("logic_expression", 
+			"rel_expression LOGICOP rel_expression", 
+			$<info>1->getName() + $<info>2->getName() + $<info>3->getName());
+		}
+		;
 			
-rel_expression	: simple_expression 
-		| simple_expression RELOP simple_expression	
+rel_expression	: simple_expression {
+			$<info>$ = handleRule("rel_expression", 
+			"simple_expression", 
+			$<info>1->getName());		
+		}
+		| simple_expression RELOP simple_expression {
+			$<info>$ = handleRule("rel_expression", 
+			"simple_expression RELOP simple_expression", 
+			$<info>1->getName() + $<info>2->getName() + $<info>3->getName());
+		}
 		;
 				
-simple_expression : term 
-		  | simple_expression ADDOP term 
-		  ;
+simple_expression : term  {
+			$<info>$ = handleRule("simple_expression", 
+			"term", 
+			$<info>1->getName());		
+		}
+		| simple_expression ADDOP term {
+			$<info>$ = handleRule("simple_expression", 
+			"simple_expression ADDOP term", 
+			$<info>1->getName() + $<info>2->getName() + $<info>3->getName());
+		}
+		;
 					
-term :	unary_expression
-     |  term MULOP unary_expression
-     ;
+term :	unary_expression {
+			$<info>$ = handleRule("term", 
+			"unary_expression", 
+			$<info>1->getName());		
+		}
+     	|  term MULOP unary_expression {
+			$<info>$ = handleRule("term", 
+			"term MULOP unary_expression", 
+			$<info>1->getName() + $<info>2->getName() + $<info>3->getName());
+		}
+     	;
 
-unary_expression : ADDOP unary_expression  
-		 | NOT unary_expression 
-		 | factor 
-		 ;
+unary_expression : ADDOP unary_expression {
+			$<info>$ = handleRule("unary_expression", 
+			"ADDOP unary_expression", 
+			$<info>1->getName() + $<info>2->getName());
+		}
+		| NOT unary_expression {
+			$<info>$ = handleRule("unary_expression", 
+			"NOT unary_expression", 
+			"!" + $<info>2->getName());
+		}
+		| factor {
+			$<info>$ = handleRule("unary_expression", 
+			"factor", 
+			$<info>1->getName());		
+		}
+		;
 	
-factor	: variable 
-	| ID LPAREN argument_list RPAREN
-	| LPAREN expression RPAREN
-	| CONST_INT 
-	| CONST_FLOAT
-	| variable INCOP 
-	| variable DECOP
-	;
+factor	: variable {
+			$<info>$ = handleRule("factor", 
+			"variable", 
+			$<info>1->getName());		
+		}
+		| ID LPAREN argument_list RPAREN {
+			$<info>$ = handleRule("factor", 
+			"ID LPAREN argument_list RPAREN", 
+			$<info>1->getName() + "(" + 
+			$<info>3->getName() + ")");
+		}
+		| LPAREN expression RPAREN {
+			$<info>$ = handleRule("factor", 
+			"LPAREN expression RPAREN", 
+			"(" + $<info>2->getName() + ")");
+		}
+		| CONST_INT {
+			$<info>$ = handleRule("factor", 
+			"CONST_INT", 
+			$<info>1->getName());		
+		}
+		| CONST_FLOAT {
+			$<info>$ = handleRule("factor", 
+			"CONST_FLOAT", 
+			$<info>1->getName());		
+		}
+		| variable INCOP {
+			$<info>$ = handleRule("factor", 
+			"variable INCOP", 
+			$<info>1->getName() + "++");
+		}
+		| variable DECOP {
+			$<info>$ = handleRule("factor", 
+			"variable DECOP", 
+			$<info>1->getName() + "--");
+		}
+		;
 	
-argument_list : arguments
-			  |
-			  ;
+argument_list : arguments {
+			$<info>$ = handleRule("argument_list", 
+			"arguments", 
+			$<info>1->getName());
+		}
+		|
+		;
 	
-arguments : arguments COMMA logic_expression
-	      | logic_expression
-	      ;
+arguments : arguments COMMA logic_expression {
+			$<info>$ = handleRule("arguments", 
+			"arguments COMMA logic_expression", 
+			$<info>1->getName() + "," + $<info>3->getName());
+		}
+	   	| logic_expression {
+			$<info>$ = handleRule("arguments", 
+			"logic_expression", 
+			$<info>1->getName());
+		}
+	  	;
  
 
 %%
