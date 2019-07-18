@@ -38,6 +38,9 @@ SymbolInfo* info;
 %left LOGICOP 
 %left BITOP
 
+%nonassoc LOWER_THAN_ELSE
+%nonassoc ELSE
+
 %start start
 
 %%
@@ -95,11 +98,11 @@ statements : statement
 	   | statements statement
 	   ;
 	   
-statement : var_declaration
+statement : var_declaration		
 	  | expression_statement
 	  | compound_statement
 	  | FOR LPAREN expression_statement expression_statement expression RPAREN statement
-	  | IF LPAREN expression RPAREN statement
+	  | IF LPAREN expression RPAREN statement %prec LOWER_THAN_ELSE
 	  | IF LPAREN expression RPAREN statement ELSE statement
 	  | WHILE LPAREN expression RPAREN statement
 	  | PRINTLN LPAREN ID RPAREN SEMICOLON
