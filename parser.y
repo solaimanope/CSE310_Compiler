@@ -50,83 +50,227 @@ SymbolInfo* info;
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE
 
-//%start start
-%start expression_statement
+%start start
+//%start expression_statement
 %%
 
-start : program
-	{
-		//write your code in this block in all the similar blocks below
-	}
-	;
+start : program{
+			$<info>$ = handleRule("start",
+			"program",
+			$<info>1->getName());
+		}
+		;
 
-program : program unit 
-	| unit
-	;
+program : program unit {
+			$<info>$ = handleRule("program",
+			"program unit",
+			$<info>1->getName() + $<info>2->getName());
+		}
+		| unit {
+			$<info>$ = handleRule("program",
+			"unit",
+			$<info>1->getName());
+		}
+		;
 	
-unit : var_declaration
-     | func_declaration
-     | func_definition
-     ;
+unit : var_declaration {
+			$<info>$ = handleRule("unit",
+			"var_declaration",
+			$<info>1->getName());
+		}
+     	| func_declaration {
+			$<info>$ = handleRule("unit",
+			"func_declaration",
+			$<info>1->getName());
+		}
+     	| func_definition {
+			$<info>$ = handleRule("unit",
+			"func_definition",
+			$<info>1->getName());
+		}
+     	;
      
-func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON
-		| type_specifier ID LPAREN RPAREN SEMICOLON
+func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON {
+			$<info>$ = handleRule("func_declaration",
+			"type_specifier ID LPAREN parameter_list RPAREN SEMICOLON",
+			$<info>1->getName() + " " + $<info>2->getName() + "(" + 
+			$<info>4->getName() + ")" + ";"  + "\n");
+		}
+		| type_specifier ID LPAREN RPAREN SEMICOLON {
+			$<info>$ = handleRule("func_declaration",
+			"type_specifier ID LPAREN RPAREN SEMICOLON",
+			$<info>1->getName() + " " + $<info>2->getName() + "(" + ")" + ";" + "\n");
+		}
 		;
 		 
-func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement
-		| type_specifier ID LPAREN RPAREN compound_statement
+func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement {
+			$<info>$ = handleRule("func_definition",
+			"type_specifier ID LPAREN parameter_list RPAREN compound_statement",
+			$<info>1->getName() + " " + $<info>2->getName() + "(" + 
+			$<info>4->getName() + ")" + $<info>6->getName() );
+		}
+		| type_specifier ID LPAREN RPAREN compound_statement {
+			$<info>$ = handleRule("func_definition",
+			"type_specifier ID LPAREN RPAREN compound_statement",
+			$<info>1->getName() + " " + $<info>2->getName() + 
+			"(" + ")" + $<info>5->getName() );
+		}
  		;				
 
 
-parameter_list  : parameter_list COMMA type_specifier ID
-		| parameter_list COMMA type_specifier
- 		| type_specifier ID
-		| type_specifier
+parameter_list  : parameter_list COMMA type_specifier ID {
+			$<info>$ = handleRule("parameter_list",
+			"parameter_list COMMA type_specifier ID",
+			$<info>1->getName() + "," + 
+			$<info>3->getName() + " " + $<info>4->getName());
+		}
+		| parameter_list COMMA type_specifier {
+			$<info>$ = handleRule("parameter_list",
+			"parameter_list COMMA type_specifier",
+			$<info>1->getName() + "," + $<info>3->getName());
+		}
+ 		| type_specifier ID {
+			$<info>$ = handleRule("parameter_list",
+			"type_specifier ID",
+			$<info>1->getName() + " " + $<info>2->getName());
+		}
+		| type_specifier {
+			$<info>$ = handleRule("parameter_list",
+			"type_specifier",
+			$<info>1->getName());
+		}
  		;
 
  		
-compound_statement : LCURL statements RCURL
- 		    | LCURL RCURL
- 		    ;
+compound_statement : LCURL statements RCURL {
+			$<info>$ = handleRule("compound_statement", 
+			"LCURL statements RCURL", 
+			"{\n" + $<info>2->getName() + "}" + "\n");
+		}
+ 		| LCURL RCURL {
+			$<info>$ = handleRule("compound_statement", 
+			"LCURL RCURL", 
+			"{}");
+		}
+ 		;
  		    
-var_declaration : type_specifier declaration_list SEMICOLON
- 		 ;
+var_declaration : type_specifier declaration_list SEMICOLON {
+			$<info>$ = handleRule("var_declaration", 
+			"type_specifier declaration_list SEMICOLON", 
+			$<info>1->getName() + " " + $<info>2->getName() + ";" + "\n");
+		}
+ 		;
  		 
-type_specifier	: INT
- 		| FLOAT
- 		| VOID
+type_specifier	: INT {
+			$<info>$ = handleRule("type_specifier", 
+			"INT", 
+			"int");
+		}
+ 		| FLOAT {
+			$<info>$ = handleRule("type_specifier", 
+			"FLOAT", 
+			"float");
+		}
+ 		| VOID {
+			$<info>$ = handleRule("type_specifier", 
+			"VOID", 
+			"void");
+		}
  		;
  		
-declaration_list : declaration_list COMMA ID
- 		  | declaration_list COMMA ID LTHIRD CONST_INT RTHIRD
- 		  | ID
- 		  | ID LTHIRD CONST_INT RTHIRD
- 		  ;
+declaration_list : declaration_list COMMA ID {
+			$<info>$ = handleRule("declaration_list", 
+			"declaration_list COMMA ID", 
+			$<info>1->getName() + "," + $<info>3->getName());
+		}
+ 		| declaration_list COMMA ID LTHIRD CONST_INT RTHIRD {
+			$<info>$ = handleRule("declaration_list", 
+			"declaration_list COMMA ID LTHIRD CONST_INT RTHIRD", 
+			$<info>1->getName() + "," + $<info>3->getName() + 
+			"[" + $<info>5->getName() + "]");
+		}
+	  	| ID {
+			$<info>$ = handleRule("declaration_list", 
+			"ID", 
+			$<info>1->getName());
+		}
+		| ID LTHIRD CONST_INT RTHIRD {
+			$<info>$ = handleRule("declaration_list", 
+			"ID LTHIRD CONST_INT RTHIRD", 
+			$<info>1->getName() + "[" + $<info>3->getName() + "]");
+		}
+ 		;
  		  
-statements : statement
-	   | statements statement
-	   ;
+statements : statement {
+			$<info>$ = handleRule("statements", 
+			"statement", 
+			$<info>1->getName());	
+		}
+	   	| statements statement {
+			$<info>$ = handleRule("statements", 
+			"statements statement", 
+			$<info>1->getName() + $<info>2->getName());
+		}
+	   	;
 	   
-statement : var_declaration		
-	  | expression_statement
-	  | compound_statement
-	  | FOR LPAREN expression_statement expression_statement expression RPAREN statement
-	  | IF LPAREN expression RPAREN statement %prec LOWER_THAN_ELSE
-	  | IF LPAREN expression RPAREN statement ELSE statement
-	  | WHILE LPAREN expression RPAREN statement
-	  | PRINTLN LPAREN ID RPAREN SEMICOLON
-	  | RETURN expression SEMICOLON
-	  ;
+statement : var_declaration	{
+			$<info>$ = handleRule("statement", 
+			"var_declaration", 
+			$<info>1->getName());	
+		}
+	  	| expression_statement {
+			$<info>$ = handleRule("statement", 
+			"expression_statement", 
+			$<info>1->getName());	
+		}
+	  	| compound_statement {
+			$<info>$ = handleRule("statement", 
+			"compound_statement", 
+			$<info>1->getName());	
+		}
+	  	| FOR LPAREN expression_statement expression_statement expression RPAREN statement {
+			$<info>$ = handleRule("statement", 
+			"FOR LPAREN expression_statement expression_statement expression RPAREN statement", 
+			"for(" + $<info>3->getName() + $<info>4->getName() + 
+			$<info>5->getName() + ")" + $<info>7->getName());
+		}
+	  	| IF LPAREN expression RPAREN statement %prec LOWER_THAN_ELSE {
+			$<info>$ = handleRule("statement", 
+			"IF LPAREN expression RPAREN statement", 
+			"if(" + $<info>3->getName() + ")" + $<info>5->getName());
+		}
+	  	| IF LPAREN expression RPAREN statement ELSE statement {
+			$<info>$ = handleRule("statement", 
+			"IF LPAREN expression RPAREN statement ELSE statement", 
+			"if(" + $<info>3->getName() + ")" + $<info>5->getName() + 
+			"else" + $<info>7->getName());
+		}
+	  	| WHILE LPAREN expression RPAREN statement {
+			$<info>$ = handleRule("statement", 
+			"WHILE LPAREN expression RPAREN statement", 
+			"while(" + $<info>3->getName() + ")" + $<info>5->getName());
+		}
+	  	| PRINTLN LPAREN ID RPAREN SEMICOLON {
+			$<info>$ = handleRule("statement", 
+			"PRINTLN LPAREN ID RPAREN SEMICOLON", 
+			"println(" + $<info>3->getName() + ");" + "\n");
+		}
+	  	| RETURN expression SEMICOLON {
+			$<info>$ = handleRule("statement", 
+			"RETURN expression SEMICOLON", 
+			"return " + $<info>2->getName() + ";" + "\n");
+		}
+	  	;
 	  
 expression_statement : SEMICOLON {
 			$<info>$ = handleRule("expression_statement", 
 			"SEMICOLON", 
-			";");		
+			";\n");		
 		}
 		| expression SEMICOLON {
 			$<info>$ = handleRule("expression_statement", 
 			"expression SEMICOLON", 
-			$<info>1->getName() + ";");
+			$<info>1->getName() + ";\n");
 		}
 		;
 	  
@@ -151,7 +295,7 @@ expression : logic_expression {
 	   	| variable ASSIGNOP logic_expression {
 			$<info>$ = handleRule("expression", 
 			"variable ASSIGNOP logic_expression", 
-			$<info>1->getName() + "=" + $<info>3->getName());
+			$<info>1->getName() + " = " + $<info>3->getName());
 		}
 	   	;
 			
