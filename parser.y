@@ -27,6 +27,18 @@ SymbolInfo *handleRule(string LHS, string RHS, string total)
 	return new SymbolInfo(total, LHS);
 }
 
+string indentate(string s)
+{
+	string t;
+	t += '\t';
+	for (int i = 0; i < s.size(); i++) {
+		char c = s[i];
+		t += c;
+		if (i+1 < s.size() && c=='\n') t += '\t';
+	}
+	return t;
+}
+
 #define ONE_PART { }
 
 %}
@@ -145,7 +157,7 @@ parameter_list  : parameter_list COMMA type_specifier ID {
 compound_statement : LCURL statements RCURL {
 			$<info>$ = handleRule("compound_statement", 
 			"LCURL statements RCURL", 
-			"{\n" + $<info>2->getName() + "}" + "\n");
+			"{\n" + indentate($<info>2->getName()) + "}" + "\n");
 		}
  		| LCURL RCURL {
 			$<info>$ = handleRule("compound_statement", 
@@ -231,24 +243,24 @@ statement : var_declaration	{
 	  	| FOR LPAREN expression_statement expression_statement expression RPAREN statement {
 			$<info>$ = handleRule("statement", 
 			"FOR LPAREN expression_statement expression_statement expression RPAREN statement", 
-			"for(" + $<info>3->getName() + $<info>4->getName() + 
-			$<info>5->getName() + ")" + $<info>7->getName());
+			"for (" + $<info>3->getName() + $<info>4->getName() + 
+			$<info>5->getName() + ") " + $<info>7->getName() );
 		}
 	  	| IF LPAREN expression RPAREN statement %prec LOWER_THAN_ELSE {
 			$<info>$ = handleRule("statement", 
 			"IF LPAREN expression RPAREN statement", 
-			"if(" + $<info>3->getName() + ")" + $<info>5->getName());
+			"if (" + $<info>3->getName() + ") " + $<info>5->getName());
 		}
 	  	| IF LPAREN expression RPAREN statement ELSE statement {
 			$<info>$ = handleRule("statement", 
 			"IF LPAREN expression RPAREN statement ELSE statement", 
-			"if(" + $<info>3->getName() + ")" + $<info>5->getName() + 
-			"else" + $<info>7->getName());
+			"if (" + $<info>3->getName() + ") " + $<info>5->getName() + 
+			"else " + $<info>7->getName());
 		}
 	  	| WHILE LPAREN expression RPAREN statement {
 			$<info>$ = handleRule("statement", 
 			"WHILE LPAREN expression RPAREN statement", 
-			"while(" + $<info>3->getName() + ")" + $<info>5->getName());
+			"while (" + $<info>3->getName() + ") " + $<info>5->getName());
 		}
 	  	| PRINTLN LPAREN ID RPAREN SEMICOLON {
 			$<info>$ = handleRule("statement", 
