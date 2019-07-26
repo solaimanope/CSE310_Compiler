@@ -12,7 +12,7 @@ ofstream logout;
 ofstream errorout;
 extern int line_count;
 
-//SymbolTable *table;
+SymbolTable *table;
 int ScopeTable::objectCounter = 0;
 
 void yyerror(char *s)
@@ -39,8 +39,9 @@ string indentate(string s)
 	return t;
 }
 
-#define ONE_PART { }
+vector< SymbolInfo* >declared;
 
+#define ONE_PART { }
 %}
 
 %union {
@@ -127,7 +128,7 @@ func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statem
 			$<info>1->getName() + " " + $<info>2->getName() + 
 			"(" + ")" + $<info>5->getName() );
 		}
- 		;				
+ 		;
 
 
 parameter_list  : parameter_list COMMA type_specifier ID {
@@ -154,15 +155,21 @@ parameter_list  : parameter_list COMMA type_specifier ID {
  		;
 
  		
-compound_statement : LCURL statements RCURL {
+compound_statement : LCURL { table->enterScope(); } statements RCURL {
 			$<info>$ = handleRule("compound_statement", 
 			"LCURL statements RCURL", 
-			"{\n" + indentate($<info>2->getName()) + "}" + "\n");
+			"{\n" + indentate($<info>3->getName()) + "}" + "\n");
+			table->printAllScopeTable(logout);	
+			//table->printAllScopeTable(cout);
+			table->exitScope();
 		}
- 		| LCURL RCURL {
+ 		| LCURL { table->enterScope(); } RCURL {
 			$<info>$ = handleRule("compound_statement", 
 			"LCURL RCURL", 
 			"{}");
+			table->printAllScopeTable(logout);
+			//table->printAllScopeTable(cout);
+			table->exitScope();
 		}
  		;
  		    
@@ -170,6 +177,15 @@ var_declaration : type_specifier declaration_list SEMICOLON {
 			$<info>$ = handleRule("var_declaration", 
 			"type_specifier declaration_list SEMICOLON", 
 			$<info>1->getName() + " " + $<info>2->getName() + ";" + "\n");
+			for (SymbolInfo *sip : declared) {
+				sip->setVariableType($<info>1->getName());
+				table->insert(sip->getName(), sip->getType());
+				SymbolInfo *inside = table->lookup(sip->getName());
+				inside->copyValues(sip);
+				//inside->print(cout);
+			}
+			//cout << endl;
+			declared.clear();
 		}
  		;
  		 
@@ -194,22 +210,28 @@ declaration_list : declaration_list COMMA ID {
 			$<info>$ = handleRule("declaration_list", 
 			"declaration_list COMMA ID", 
 			$<info>1->getName() + "," + $<info>3->getName());
+			declared.push_back($<info>3);
 		}
  		| declaration_list COMMA ID LTHIRD CONST_INT RTHIRD {
 			$<info>$ = handleRule("declaration_list", 
 			"declaration_list COMMA ID LTHIRD CONST_INT RTHIRD", 
 			$<info>1->getName() + "," + $<info>3->getName() + 
 			"[" + $<info>5->getName() + "]");
+			$<info>3->setArray();
+			declared.push_back($<info>3);
 		}
 	  	| ID {
 			$<info>$ = handleRule("declaration_list", 
 			"ID", 
 			$<info>1->getName());
+			declared.push_back($<info>1);
 		}
 		| ID LTHIRD CONST_INT RTHIRD {
 			$<info>$ = handleRule("declaration_list", 
 			"ID LTHIRD CONST_INT RTHIRD", 
 			$<info>1->getName() + "[" + $<info>3->getName() + "]");
+			$<info>1->setArray();
+			declared.push_back($<info>1);
 		}
  		;
  		  
@@ -450,8 +472,12 @@ int main(int argc,char *argv[])
 	errorout.open("error.txt");
 
 	yyin=fin;
+
+	table = new SymbolTable(5);
+	table->enterScope();
 	yyparse();
 	
+	delete table;
 	fclose(fin);
 	logout.close();
     errorout.close();

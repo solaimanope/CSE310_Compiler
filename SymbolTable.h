@@ -1,22 +1,46 @@
+#ifndef SYMBOLTABLE_H
+#define SYMBOLTABLE_H
+
 #include<bits/stdc++.h>
 using namespace std;
 typedef pair<int,int>PII;
-
 /*
 ostream &operator<<(ostream &out, const PII &p)
 {
     return out << "(" << p.first << "," << p.second << ")";
-}*/
+}
+*/
+
+extern ofstream logout;
 
 class SymbolInfo {
     typedef SymbolInfo* SymbolInfoPtr;
 
     string name, type;
     SymbolInfoPtr nextSymbol;
+	
+	string variableType;
+	bool isArray, isFunction;
 
 public:
 
-    SymbolInfo(string name, string type) : name(name), type(type), nextSymbol(nullptr) {}
+    SymbolInfo(string name, string type) : name(name), type(type), nextSymbol(nullptr) {
+		variableType = "";
+		isArray = false;
+		isFunction = false;
+	}
+
+	void setArray() {
+		isArray = true;
+	}
+
+	void setFunction() {
+		isFunction = true;
+	}
+
+	void setVariableType(string type) {
+        this->variableType = type;
+    }
 
     void setName(string name) {
         this->name = name;
@@ -33,20 +57,28 @@ public:
     string getType() const {
         return type;
     }
+		
+	void copyValues(SymbolInfoPtr sip) {
+		variableType = sip->variableType;
+		isArray = sip->isArray;
+		isFunction = sip->isFunction;
+	}
+	
     SymbolInfoPtr getNextSymbol() {
         return nextSymbol;
     }
     bool hasNext() {
         return nextSymbol!=nullptr;
     }
+	void print(ostream &out) {
+		out << "< " << getName() << " : " << getType();
+		if (isArray) out << " : isArray";
+		if (isFunction) out << " : isFunction";
+		out << " >";
+	}
 };
 
 typedef SymbolInfo* SymbolInfoPtr;
-/*
-ostream &operator<<(ostream &out, const SymbolInfo &si)
-{
-    return out << "< " << si.getName() << " : " << si.getType() << " >";
-}*/
 
 class ScopeTable {
     typedef ScopeTable* ScopeTablePtr;
@@ -73,6 +105,8 @@ class ScopeTable {
 public:
     ScopeTable(int n) {
         id = ++objectCounter;
+		//cout << "id " << id << " created" << endl;
+		logout << "id " << id << " created" << endl;
         parentScope = nullptr;
         this->n = n;
         table = new SymbolInfoPtr[n];
@@ -117,7 +151,6 @@ public:
     bool insert(string name, string type) {
         SymbolInfoPtr old = lookUp(name);
         if (old!=nullptr) {
-            //cout << *old << " already exists in current ScopeTable" << endl;
             return false;
         }
         int idx = getHashValue(name);
@@ -133,7 +166,6 @@ public:
     bool remove(string name) {
         SymbolInfoPtr sip = lookUp(name);
         if (sip==nullptr) {
-            //cout << name << " not found" << endl;
             return false;
         }
         //cout << "Deleted entry at " << indexLookUp(name) <<
@@ -171,23 +203,21 @@ public:
         assert(0 <= idx && idx < n);
         return table[idx];
     }
-};
-/*
-ostream &operator<<(ostream &out, const ScopeTable &st)
-{
-    out << "ScopeTable # " << st.getScopeId() << endl;
 
-    for (int i = 0; i < st.getBucketSize(); i++) {
-        out << i << " -->";
-        SymbolInfoPtr sip = st.getList(i);
-        while (sip != nullptr) {
-            out << " " << *sip;
-            sip = sip->getNextSymbol();
-        }
-        out << endl;
-    }
-    return out;
-}*/
+	void print(ostream &out) {
+		out << "ScopeTable # " << getScopeId() << endl;
+		for (int i = 0; i < getBucketSize(); i++) {
+		    out << i << " -->";
+		    SymbolInfoPtr sip = getList(i);
+		    while (sip != nullptr) {
+		        out << " "; sip->print(out);
+		        sip = sip->getNextSymbol();
+		    }
+		    out << endl;
+		}
+	}
+};
+
 
 typedef ScopeTable* ScopeTablePtr;
 
@@ -197,7 +227,7 @@ class SymbolTable {
 
 public:
     SymbolTable(int bucketSize) : bucketSize(bucketSize) {
-        stack = new ScopeTable(bucketSize);
+        //stack = new ScopeTable(bucketSize);
     }
 
     ~SymbolTable() {
@@ -238,25 +268,23 @@ public:
         while (stp != nullptr) {
             SymbolInfoPtr sip = stp->lookUp(name);
             if (sip!=nullptr) {
-                //cout << "Found in ScopeTable# " << stp->getScopeId() <<
-                //        " at position " << stp->indexLookUp(name) << endl;
                 return sip;
             }
             stp = stp->getParentScope();
         }
-        //cout << "Not found" << endl;
         return nullptr;
     }
 
-    void printCurrentScopeTable() {
-        //cout << *stack << endl;
+    void printCurrentScopeTable(ostream &out) {
+		stack->print(out);
     }
-    void printAllScopeTable() {
+    void printAllScopeTable(ostream &out) {
         ScopeTablePtr stp = stack;
         while (stp != nullptr) {
-            //cout << *stp << endl;
+			stp->print(out);
             stp = stp->getParentScope();
         }
     }
 };
 
+#endif
