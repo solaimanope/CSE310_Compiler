@@ -46,8 +46,22 @@ public:
 		return function;
 	}
 
+	bool isVoid() {
+		return variableType=="void";
+	}
+	bool isFloat() {
+		return variableType=="float";
+	}
+	bool isInt() {
+		return variableType=="int";
+	}
+
 	void setVariableType(string type) {
         this->variableType = type;
+    }
+
+	string getVariableType() {
+        return variableType;
     }
 
     void setName(string name) {

@@ -20,16 +20,45 @@ void yyerror(char *s)
 	//write your code
 }
 
+void showError(string text) {
+	errorout << "Error at Line " << line_count << ": ";
+	errorout << text << "\n\n";
+}
+
+
+string convert(string type1, string type2) {
+	string ret = type1;
+	if (type2=="float") ret = type2;	
+	return ret;
+}
+
+string binaryOperator(SymbolInfoPtr info1, string oprtr, SymbolInfoPtr info2) {
+	string ret = "void";
+	if (oprtr=="%") {
+		if (!info1->isInt() || !info2->isInt()) {
+			showError("Non-Integer operand on modulus operator");
+		} else {
+			ret = "int";
+		}
+	} else {
+		if (info1->isVoid() || info2->isVoid()) {
+			//errorout << info1->getName() << ", " << info2->getName() << "\n";
+			showError("Type mismatch : void in expression");
+		} else {
+			if (info1->getVariableType() != info2->getVariableType()) {
+				showError("Type mismatch");
+			}
+			ret = convert(info1->getVariableType(), info2->getVariableType());
+		}
+	}
+	return ret;
+}
+
 SymbolInfo *handleRule(string LHS, string RHS, string total)
 {
 	logout << "At line no: " << line_count << " " << LHS << " : " << RHS << "\n\n";
 	logout << total << "\n\n";
 	return new SymbolInfo(total, LHS);
-}
-
-void showError(string text) {
-	errorout << "Error at Line " << line_count << ": ";
-	errorout << text << "\n\n";
 }
 
 string indentate(string s)
@@ -43,6 +72,7 @@ string indentate(string s)
 	}
 	return t;
 }
+
 
 vector< SymbolInfo* >declared;
 
@@ -322,6 +352,7 @@ expression_statement : SEMICOLON {
 variable : ID {
 			$<info>$ = handleRule("variable", "ID", $<info>1->getName());
 
+			$<info>$->setVariableType("void");
 			SymbolInfoPtr sip = table->lookUp($<info>1->getName());
 			if (sip==nullptr) {
 				showError("Undeclared Variable: " + $<info>1->getName());
@@ -330,20 +361,23 @@ variable : ID {
 			} else if (sip->isFunction()) {
 				showError("Function " + $<info>1->getName() + " accessed without parameters");
 			} else {
-				$<info>$->copyValues(sip);	
+				$<info>$->setVariableType(sip->getVariableType());	
 			}
 		}
 	 	| ID LTHIRD expression RTHIRD {
 			$<info>$ = handleRule("variable", "ID LTHIRD expression RTHIRD",
 			$<info>1->getName() + "[" + $<info>3->getName() + "]");
 
+			$<info>$->setVariableType("void");
 			SymbolInfoPtr sip = table->lookUp($<info>1->getName());
 			if (sip==nullptr) {
 				showError("Undeclared Array: " + $<info>1->getName());
 			} else if (!sip->isArray()) {
 				showError("Declared " + $<info>1->getName() + " is not an array");
-			} else if (sip->isFunction()) {
-				showError("Function " + $<info>1->getName() + " accessed without parameters");
+			} else if (!$<info>3->isInt()) {
+				showError("Non-integer Array Index");
+			} else {
+				$<info>$->setVariableType(sip->getVariableType());	
 			}
 		}
 	 	;
@@ -351,60 +385,78 @@ variable : ID {
 expression : logic_expression {
 			$<info>$ = handleRule("expression", 
 			"logic_expression", 
-			$<info>1->getName());		
+			$<info>1->getName());
+			$<info>$->setVariableType($<info>1->getVariableType());	
 		}
 	   	| variable ASSIGNOP logic_expression {
 			$<info>$ = handleRule("expression", 
 			"variable ASSIGNOP logic_expression", 
 			$<info>1->getName() + " = " + $<info>3->getName());
+			$<info>$->setVariableType(
+			binaryOperator($<info>1, $<info>2->getName(), $<info>3));
+			$<info>$->setVariableType($<info>1->getVariableType());	// forced set
 		}
 	   	;
 			
 logic_expression : rel_expression {
 			$<info>$ = handleRule("logic_expression", 
 			"rel_expression", 
-			$<info>1->getName());		
+			$<info>1->getName());
+			$<info>$->setVariableType($<info>1->getVariableType());	
 		}	
 		| rel_expression LOGICOP rel_expression {
 			$<info>$ = handleRule("logic_expression", 
 			"rel_expression LOGICOP rel_expression", 
 			$<info>1->getName() + $<info>2->getName() + $<info>3->getName());
+			$<info>$->setVariableType(
+			binaryOperator($<info>1, $<info>2->getName(), $<info>3));
+			$<info>$->setVariableType("int");	// forced set
 		}
 		;
 			
 rel_expression	: simple_expression {
 			$<info>$ = handleRule("rel_expression", 
-			"simple_expression", 
-			$<info>1->getName());		
+			"simple_expression",
+			$<info>1->getName());
+			$<info>$->setVariableType($<info>1->getVariableType());	
 		}
 		| simple_expression RELOP simple_expression {
 			$<info>$ = handleRule("rel_expression", 
 			"simple_expression RELOP simple_expression", 
 			$<info>1->getName() + $<info>2->getName() + $<info>3->getName());
+			$<info>$->setVariableType(
+			binaryOperator($<info>1, $<info>2->getName(), $<info>3));
+			$<info>$->setVariableType("int");	// forced set
 		}
 		;
 				
 simple_expression : term  {
 			$<info>$ = handleRule("simple_expression", 
 			"term", 
-			$<info>1->getName());		
+			$<info>1->getName());
+			$<info>$->setVariableType($<info>1->getVariableType());		
 		}
 		| simple_expression ADDOP term {
 			$<info>$ = handleRule("simple_expression", 
-			"simple_expression ADDOP term", 
+			"simple_expression ADDOP term",
 			$<info>1->getName() + $<info>2->getName() + $<info>3->getName());
+			$<info>$->setVariableType(
+			binaryOperator($<info>1, $<info>2->getName(), $<info>3));
 		}
 		;
 					
 term :	unary_expression {
 			$<info>$ = handleRule("term", 
 			"unary_expression", 
-			$<info>1->getName());		
+			$<info>1->getName());
+			$<info>$->setVariableType($<info>1->getVariableType());	
 		}
      	|  term MULOP unary_expression {
 			$<info>$ = handleRule("term", 
 			"term MULOP unary_expression", 
 			$<info>1->getName() + $<info>2->getName() + $<info>3->getName());
+			$<info>$->setVariableType(
+			binaryOperator($<info>1, $<info>2->getName(), $<info>3));
 		}
      	;
 
@@ -412,34 +464,53 @@ unary_expression : ADDOP unary_expression {
 			$<info>$ = handleRule("unary_expression", 
 			"ADDOP unary_expression", 
 			$<info>1->getName() + $<info>2->getName());
+			/// needs attention			
+			// $<info>$->setVariableType($<info>1->getVariableType());	
 		}
 		| NOT unary_expression {
 			$<info>$ = handleRule("unary_expression", 
 			"NOT unary_expression", 
 			"!" + $<info>2->getName());
+			$<info>$->setVariableType($<info>1->getVariableType());
+			/// needs attention			
+			// $<info>$->setVariableType($<info>1->getVariableType());	
 		}
 		| factor {
 			$<info>$ = handleRule("unary_expression", 
 			"factor", 
-			$<info>1->getName());		
+			$<info>1->getName());
+			$<info>$->setVariableType($<info>1->getVariableType());	
 		}
 		;
 	
 factor	: variable {
 			$<info>$ = handleRule("factor", 
 			"variable", 
-			$<info>1->getName());		
+			$<info>1->getName());
+			$<info>$->setVariableType($<info>1->getVariableType());
 		}
 		| ID LPAREN argument_list RPAREN {
-			$<info>$ = handleRule("factor", 
+			$<info>$ = handleRule("factor",
 			"ID LPAREN argument_list RPAREN", 
 			$<info>1->getName() + "(" + 
 			$<info>3->getName() + ")");
+			
+			/// needs attention
+			$<info>$->setVariableType("void");
+			SymbolInfoPtr sip = table->lookUp($<info>1->getName());
+			if (sip==nullptr) {
+				showError("Undeclared Function: " + $<info>1->getName());
+			} else if (!sip->isFunction()) {
+				showError("Declared " + $<info>1->getName() + " is not a function");
+			} else {
+				$<info>$->setVariableType(sip->getVariableType());	
+			}
 		}
 		| LPAREN expression RPAREN {
 			$<info>$ = handleRule("factor", 
 			"LPAREN expression RPAREN", 
 			"(" + $<info>2->getName() + ")");
+			$<info>$->setVariableType($<info>2->getVariableType());
 		}
 		| CONST_INT {
 			$<info>$ = handleRule("factor", 
@@ -457,13 +528,13 @@ factor	: variable {
 			$<info>$ = handleRule("factor", 
 			"variable INCOP", 
 			$<info>1->getName() + "++");
-			$<info>$->copyValues($<info>1);
-			
+			$<info>$->setVariableType($<info>1->getVariableType());
 		}
 		| variable DECOP {
 			$<info>$ = handleRule("factor", 
 			"variable DECOP", 
 			$<info>1->getName() + "--");
+			$<info>$->setVariableType($<info>1->getVariableType());
 		}
 		;
 	
