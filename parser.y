@@ -3,6 +3,7 @@
 #include "SymbolTable.h"
 
 using namespace std;
+typedef pair<string,string>VAR;
 
 int yyparse(void);
 int yylex(void);
@@ -14,6 +15,9 @@ extern int line_count;
 
 SymbolTable *table;
 int ScopeTable::objectCounter = 0;
+
+vector< SymbolInfo* >declared;
+vector< Variable >parameters;
 
 void yyerror(char *s)
 {
@@ -33,19 +37,18 @@ string convert(string type1, string type2) {
 }
 
 string binaryOperator(SymbolInfoPtr info1, string oprtr, SymbolInfoPtr info2) {
-	string ret = "void";
+	string ret;
 	if (oprtr=="%") {
 		if (!info1->isInt() || !info2->isInt()) {
 			showError("Non-Integer operand on modulus operator");
-		} else {
-			ret = "int";
 		}
+		ret = "int";
 	} else {
 		if (info1->isVoid() || info2->isVoid()) {
 			//errorout << info1->getName() << ", " << info2->getName() << "\n";
 			showError("Type mismatch : void in expression");
 		} else {
-			if (info1->getVariableType() != info2->getVariableType()) {
+			if (oprtr == "=" && info1->getVariableType() != info2->getVariableType()) {
 				showError("Type mismatch");
 			}
 			ret = convert(info1->getVariableType(), info2->getVariableType());
@@ -61,6 +64,79 @@ SymbolInfo *handleRule(string LHS, string RHS, string total)
 	return new SymbolInfo(total, LHS);
 }
 
+void handleFunctionDeclaration(SymbolInfoPtr type, SymbolInfoPtr id) {
+	if (table->insert(id->getName(), id->getType())) {
+		SymbolInfoPtr inside = table->lookUp(id->getName());
+		inside->setFunction();
+		FunctionInfoPtr fip = inside->getFunctionInfo();
+		fip->returnType = type->getName();
+		fip->isDefined = false;
+		for (Variable v : parameters) {
+			fip->parameters.emplace_back(v.type);
+		}
+	} else {
+		showError("Multiple Declaration of " + id->getName());
+	}
+	parameters.clear();
+}
+
+void insertVarToTable(Variable var) {
+	table->insert(var.id, "ID");
+	SymbolInfoPtr sip = table->lookUp(var.id);
+	sip->setVariableType(var.type);
+}
+
+void handleFunctionDefinition(SymbolInfoPtr type, SymbolInfoPtr id) {
+	table->enterScope(); 	/// needs global treatment
+	SymbolInfoPtr inside = table->lookUp(id->getName());
+	if (inside == nullptr) {
+		///function was not declared
+		table->insert(id->getName(), id->getType());
+		inside = table->lookUp(id->getName());
+		inside->setFunction();
+		
+		FunctionInfoPtr fip = inside->getFunctionInfo();
+		fip->returnType = type->getName();
+		fip->isDefined = true;
+		for (Variable v : parameters) {
+			if (v.id.empty()) {
+				showError("Parameter doesn't have name");
+			} else {
+				fip->parameters.push_back(v);
+				insertVarToTable(v);
+			}
+		}
+	} else if (inside->isUndefinedFunction()) {
+		FunctionInfoPtr fip = inside->getFunctionInfo();
+		if (fip->returnType != type->getName()) {
+			showError("Return type doesn't match with declaration");
+		}
+		fip->isDefined = true;
+
+		if (fip->parameters.size()!=parameters.size()) {
+			showError("Parameter list size doesn't match with declaration");
+		}
+		int minsize = min(fip->parameters.size(), parameters.size());
+		while (parameters.size() > minsize) parameters.pop_back();
+		while (fip->parameters.size() > minsize) fip->parameters.pop_back();
+		for (int i = 0; i < minsize; i++) {
+			Variable v = parameters[i];
+			Variable w = fip->parameters[i];
+			if (v.id.empty()) {
+				showError("Parameter doesn't have name");
+			} else if (v.type != w.type) {
+				showError("Parameter type doesn't match with declaration");
+			} else {
+				fip->parameters[i] = v;
+				insertVarToTable(v);
+			}
+		}
+	} else {
+		showError("Multiple Declaration of " + id->getName());
+	}
+	parameters.clear();
+}
+
 string indentate(string s)
 {
 	string t;
@@ -73,8 +149,6 @@ string indentate(string s)
 	return t;
 }
 
-
-vector< SymbolInfo* >declared;
 
 #define ONE_PART { }
 %}
@@ -143,25 +217,31 @@ func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON {
 			"type_specifier ID LPAREN parameter_list RPAREN SEMICOLON",
 			$<info>1->getName() + " " + $<info>2->getName() + "(" + 
 			$<info>4->getName() + ")" + ";"  + "\n");
+			handleFunctionDeclaration($<info>1, $<info>2);
 		}
 		| type_specifier ID LPAREN RPAREN SEMICOLON {
 			$<info>$ = handleRule("func_declaration",
 			"type_specifier ID LPAREN RPAREN SEMICOLON",
 			$<info>1->getName() + " " + $<info>2->getName() + "(" + ")" + ";" + "\n");
+			handleFunctionDeclaration($<info>1, $<info>2);
 		}
 		;
 		 
-func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement {
+func_definition : type_specifier ID LPAREN parameter_list RPAREN {
+				handleFunctionDefinition($<info>1, $<info>2);
+			} compound_statement {
 			$<info>$ = handleRule("func_definition",
 			"type_specifier ID LPAREN parameter_list RPAREN compound_statement",
 			$<info>1->getName() + " " + $<info>2->getName() + "(" + 
-			$<info>4->getName() + ")" + $<info>6->getName() );
+			$<info>4->getName() + ")" + $<info>7->getName() );
 		}
-		| type_specifier ID LPAREN RPAREN compound_statement {
+		| type_specifier ID LPAREN RPAREN {
+				handleFunctionDefinition($<info>1, $<info>2);
+			} compound_statement {
 			$<info>$ = handleRule("func_definition",
 			"type_specifier ID LPAREN RPAREN compound_statement",
 			$<info>1->getName() + " " + $<info>2->getName() + 
-			"(" + ")" + $<info>5->getName() );
+			"(" + ")" + $<info>6->getName() );
 		}
  		;
 
@@ -171,21 +251,25 @@ parameter_list  : parameter_list COMMA type_specifier ID {
 			"parameter_list COMMA type_specifier ID",
 			$<info>1->getName() + "," + 
 			$<info>3->getName() + " " + $<info>4->getName());
+			parameters.emplace_back($<info>3->getName(), $<info>4->getName());
 		}
 		| parameter_list COMMA type_specifier {
 			$<info>$ = handleRule("parameter_list",
 			"parameter_list COMMA type_specifier",
 			$<info>1->getName() + "," + $<info>3->getName());
+			parameters.emplace_back($<info>3->getName());
 		}
  		| type_specifier ID {
 			$<info>$ = handleRule("parameter_list",
 			"type_specifier ID",
 			$<info>1->getName() + " " + $<info>2->getName());
+			parameters.emplace_back($<info>1->getName(), $<info>2->getName());
 		}
 		| type_specifier {
 			$<info>$ = handleRule("parameter_list",
 			"type_specifier",
 			$<info>1->getName());
+			parameters.emplace_back($<info>1->getName());
 		}
  		;
 
@@ -352,32 +436,35 @@ expression_statement : SEMICOLON {
 variable : ID {
 			$<info>$ = handleRule("variable", "ID", $<info>1->getName());
 
-			$<info>$->setVariableType("void");
 			SymbolInfoPtr sip = table->lookUp($<info>1->getName());
 			if (sip==nullptr) {
 				showError("Undeclared Variable: " + $<info>1->getName());
-			} else if (sip->isArray()) {
-				showError("Array " + $<info>1->getName() + " accessed without index");
-			} else if (sip->isFunction()) {
-				showError("Function " + $<info>1->getName() + " accessed without parameters");
 			} else {
-				$<info>$->setVariableType(sip->getVariableType());	
+				$<info>$->setVariableType(sip->getVariableType());
+				if (sip->isArray()) {
+					showError("Array " + $<info>1->getName() + 
+					" accessed without index");
+				} else if (sip->isFunction()) {
+					showError("Function " + $<info>1->getName() + 
+					" accessed without parameters");
+				}
 			}
 		}
 	 	| ID LTHIRD expression RTHIRD {
 			$<info>$ = handleRule("variable", "ID LTHIRD expression RTHIRD",
 			$<info>1->getName() + "[" + $<info>3->getName() + "]");
 
-			$<info>$->setVariableType("void");
 			SymbolInfoPtr sip = table->lookUp($<info>1->getName());
 			if (sip==nullptr) {
 				showError("Undeclared Array: " + $<info>1->getName());
-			} else if (!sip->isArray()) {
-				showError("Declared " + $<info>1->getName() + " is not an array");
-			} else if (!$<info>3->isInt()) {
-				showError("Non-integer Array Index");
 			} else {
-				$<info>$->setVariableType(sip->getVariableType());	
+				$<info>$->setVariableType(sip->getVariableType());
+				if (!sip->isArray()) {
+					showError("Declared " + $<info>1->getName() + " is not an array");
+				}
+				if (!$<info>3->isInt()) {
+					showError("Non-integer Array Index");
+				}
 			}
 		}
 	 	;
@@ -393,7 +480,7 @@ expression : logic_expression {
 			"variable ASSIGNOP logic_expression", 
 			$<info>1->getName() + " = " + $<info>3->getName());
 			$<info>$->setVariableType(
-			binaryOperator($<info>1, $<info>2->getName(), $<info>3));
+			binaryOperator($<info>1, "=", $<info>3));
 			$<info>$->setVariableType($<info>1->getVariableType());	// forced set
 		}
 	   	;

@@ -13,6 +13,25 @@ ostream &operator<<(ostream &out, const PII &p)
 
 extern ofstream logout;
 
+struct Variable {
+	string type, id;
+	Variable(string type) {
+		this->type = type;
+	}
+	Variable(string type, string id) {
+		this->type = type;
+		this->id = id;
+	}
+};
+
+struct FunctionInfo {
+	bool isDefined;
+	string returnType;
+	vector< Variable >parameters;
+};
+
+typedef FunctionInfo* FunctionInfoPtr;
+
 class SymbolInfo {
     typedef SymbolInfo* SymbolInfoPtr;
 
@@ -21,6 +40,7 @@ class SymbolInfo {
 	
 	string variableType;
 	bool array, function;
+	FunctionInfoPtr fip;
 
 public:
 
@@ -28,6 +48,7 @@ public:
 		variableType = "";
 		array = false;
 		function = false;
+		fip = nullptr;
 	}
 
 	void setArray() {
@@ -40,10 +61,19 @@ public:
 
 	void setFunction() {
 		function = true;
+		fip = new FunctionInfo();
+	}
+
+	FunctionInfoPtr getFunctionInfo() {
+		return fip;
 	}
 
 	bool isFunction() {
 		return function;
+	}
+
+	bool isUndefinedFunction() {
+		return function && !fip->isDefined;
 	}
 
 	bool isVoid() {

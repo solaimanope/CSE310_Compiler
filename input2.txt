@@ -10,7 +10,7 @@ int main(){
 	j=2%3.7;
 	i * d;
 	a=4;
-	func(a);
+	func(a, c);
 	b=8;
 	X[0]=2.3;
 	void u, v;
