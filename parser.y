@@ -27,6 +27,11 @@ SymbolInfo *handleRule(string LHS, string RHS, string total)
 	return new SymbolInfo(total, LHS);
 }
 
+void showError(string text) {
+	errorout << "Error at Line " << line_count << ": ";
+	errorout << text << "\n\n";
+}
+
 string indentate(string s)
 {
 	string t;
@@ -177,14 +182,20 @@ var_declaration : type_specifier declaration_list SEMICOLON {
 			$<info>$ = handleRule("var_declaration", 
 			"type_specifier declaration_list SEMICOLON", 
 			$<info>1->getName() + " " + $<info>2->getName() + ";" + "\n");
-			for (SymbolInfo *sip : declared) {
-				sip->setVariableType($<info>1->getName());
-				table->insert(sip->getName(), sip->getType());
-				SymbolInfo *inside = table->lookup(sip->getName());
-				inside->copyValues(sip);
-				//inside->print(cout);
+			
+			if ($<info>1->getName()=="void") {
+				showError("Variables declared with void type specifier");
+			} else {
+				for (SymbolInfoPtr sip : declared) {
+					sip->setVariableType($<info>1->getName());
+					if (table->insert(sip->getName(), sip->getType())) {
+						SymbolInfoPtr inside = table->lookUp(sip->getName());
+						inside->copyValues(sip);
+					} else {
+						showError("Multiple Declaration of " + sip->getName());
+					}
+				}
 			}
-			//cout << endl;
 			declared.clear();
 		}
  		;
@@ -309,15 +320,31 @@ expression_statement : SEMICOLON {
 		;
 	  
 variable : ID {
-			$<info>$ = handleRule("variable", 
-			"ID", 
-			$<info>1->getName());		
+			$<info>$ = handleRule("variable", "ID", $<info>1->getName());
+
+			SymbolInfoPtr sip = table->lookUp($<info>1->getName());
+			if (sip==nullptr) {
+				showError("Undeclared Variable: " + $<info>1->getName());
+			} else if (sip->isArray()) {
+				showError("Array " + $<info>1->getName() + " accessed without index");
+			} else if (sip->isFunction()) {
+				showError("Function " + $<info>1->getName() + " accessed without parameters");
+			} else {
+				$<info>$->copyValues(sip);	
+			}
 		}
 	 	| ID LTHIRD expression RTHIRD {
-			$<info>$ = handleRule("variable", 
-			"ID LTHIRD expression RTHIRD", 
-			$<info>1->getName() + "[" + 
-			$<info>3->getName() + "]");
+			$<info>$ = handleRule("variable", "ID LTHIRD expression RTHIRD",
+			$<info>1->getName() + "[" + $<info>3->getName() + "]");
+
+			SymbolInfoPtr sip = table->lookUp($<info>1->getName());
+			if (sip==nullptr) {
+				showError("Undeclared Array: " + $<info>1->getName());
+			} else if (!sip->isArray()) {
+				showError("Declared " + $<info>1->getName() + " is not an array");
+			} else if (sip->isFunction()) {
+				showError("Function " + $<info>1->getName() + " accessed without parameters");
+			}
 		}
 	 	;
 	 
@@ -417,17 +444,21 @@ factor	: variable {
 		| CONST_INT {
 			$<info>$ = handleRule("factor", 
 			"CONST_INT", 
-			$<info>1->getName());		
+			$<info>1->getName());
+			$<info>$->setVariableType("int");
 		}
 		| CONST_FLOAT {
 			$<info>$ = handleRule("factor", 
 			"CONST_FLOAT", 
-			$<info>1->getName());		
+			$<info>1->getName());
+			$<info>$->setVariableType("float");
 		}
 		| variable INCOP {
 			$<info>$ = handleRule("factor", 
 			"variable INCOP", 
 			$<info>1->getName() + "++");
+			$<info>$->copyValues($<info>1);
+			
 		}
 		| variable DECOP {
 			$<info>$ = handleRule("factor", 

@@ -20,22 +20,30 @@ class SymbolInfo {
     SymbolInfoPtr nextSymbol;
 	
 	string variableType;
-	bool isArray, isFunction;
+	bool array, function;
 
 public:
 
     SymbolInfo(string name, string type) : name(name), type(type), nextSymbol(nullptr) {
 		variableType = "";
-		isArray = false;
-		isFunction = false;
+		array = false;
+		function = false;
 	}
 
 	void setArray() {
-		isArray = true;
+		array = true;
+	}
+
+	bool isArray() {
+		return array;
 	}
 
 	void setFunction() {
-		isFunction = true;
+		function = true;
+	}
+
+	bool isFunction() {
+		return function;
 	}
 
 	void setVariableType(string type) {
@@ -60,8 +68,8 @@ public:
 		
 	void copyValues(SymbolInfoPtr sip) {
 		variableType = sip->variableType;
-		isArray = sip->isArray;
-		isFunction = sip->isFunction;
+		array = sip->array;
+		function = sip->function;
 	}
 	
     SymbolInfoPtr getNextSymbol() {
@@ -72,8 +80,9 @@ public:
     }
 	void print(ostream &out) {
 		out << "< " << getName() << " : " << getType();
-		if (isArray) out << " : isArray";
-		if (isFunction) out << " : isFunction";
+		if (!variableType.empty()) out << " : " << variableType;
+		if (isFunction()) out << " : isFunction";
+		if (isArray()) out << " : isArray";
 		out << " >";
 	}
 };
@@ -263,7 +272,7 @@ public:
     bool remove(string name) {
         return stack->remove(name);
     }
-    SymbolInfoPtr lookup(string name) {
+    SymbolInfoPtr lookUp(string name) {
         ScopeTablePtr stp = stack;
         while (stp != nullptr) {
             SymbolInfoPtr sip = stp->lookUp(name);
