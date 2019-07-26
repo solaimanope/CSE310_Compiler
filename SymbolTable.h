@@ -1,15 +1,6 @@
-#ifndef SYMBOLTABLE_H
-#define SYMBOLTABLE_H
-
 #include<bits/stdc++.h>
 using namespace std;
 typedef pair<int,int>PII;
-/*
-ostream &operator<<(ostream &out, const PII &p)
-{
-    return out << "(" << p.first << "," << p.second << ")";
-}
-*/
 
 extern ofstream logout;
 
@@ -124,9 +115,9 @@ public:
     }
 	void print(ostream &out) {
 		out << "< " << getName() << " : " << getType();
-		if (!variableType.empty()) out << " : " << variableType;
-		if (isFunction()) out << " : isFunction";
-		if (isArray()) out << " : isArray";
+		//if (!variableType.empty()) out << " : " << variableType;
+		//if (isFunction()) out << " : isFunction";
+		//if (isArray()) out << " : isArray";
 		out << " >";
 	}
 };
@@ -158,8 +149,7 @@ class ScopeTable {
 public:
     ScopeTable(int n) {
         id = ++objectCounter;
-		//cout << "id " << id << " created" << endl;
-		logout << "id " << id << " created" << endl;
+		//logout << "id " << id << " created" << endl;
         parentScope = nullptr;
         this->n = n;
         table = new SymbolInfoPtr[n];
@@ -260,14 +250,16 @@ public:
 	void print(ostream &out) {
 		out << "ScopeTable # " << getScopeId() << endl;
 		for (int i = 0; i < getBucketSize(); i++) {
-		    out << i << " -->";
 		    SymbolInfoPtr sip = getList(i);
+			if (sip==nullptr) continue;
+			out << i << " -->";
 		    while (sip != nullptr) {
 		        out << " "; sip->print(out);
 		        sip = sip->getNextSymbol();
 		    }
 		    out << endl;
 		}
+		out << endl;
 	}
 };
 
@@ -295,8 +287,7 @@ public:
         ScopeTablePtr stp = new ScopeTable(bucketSize);
         stp->setParentScope(stack);
         stack = stp;
-
-        //cout << "New ScopeTable with id " << stack->getScopeId() << " created" << endl;
+        logout << "New ScopeTable with id " << stack->getScopeId() << " created" << "\n\n";
     }
 
     void exitScope() {
@@ -304,7 +295,7 @@ public:
             //cout << "Error: Can't escape main scope!!" << endl;
             return;
         }
-        //cout << "ScopeTable with id " << stack->getScopeId() <<" removed" << endl;
+        logout << "ScopeTable with id " << stack->getScopeId() <<" removed" << "\n\n";
         ScopeTablePtr tmp = stack;
         stack = stack->getParentScope();
         delete tmp;
@@ -339,5 +330,3 @@ public:
         }
     }
 };
-
-#endif

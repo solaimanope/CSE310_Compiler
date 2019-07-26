@@ -3,7 +3,6 @@
 #include "SymbolTable.h"
 
 using namespace std;
-typedef pair<string,string>VAR;
 
 int yyparse(void);
 int yylex(void);
@@ -12,19 +11,26 @@ FILE *fin;
 ofstream logout;
 ofstream errorout;
 extern int line_count;
+extern int error_count;
 
 SymbolTable *table;
 int ScopeTable::objectCounter = 0;
 
 vector< SymbolInfo* >declared;
 vector< Variable >parameters;
+vector< string >argTypes;
+bool scopeCreated = false;
 
-void yyerror(char *s)
-{
+void yyerror(const char *s) {
 	//write your code
+	string ss(s);
+	error_count++;	
+	errorout << "Error at Line " << line_count << ": ";
+	errorout << ss << "\n\n";
 }
 
 void showError(string text) {
+	error_count++;	
 	errorout << "Error at Line " << line_count << ": ";
 	errorout << text << "\n\n";
 }
@@ -32,22 +38,22 @@ void showError(string text) {
 
 string convert(string type1, string type2) {
 	string ret = type1;
-	if (type2=="float") ret = type2;	
+	if (type1=="int" && type2=="float") ret = type2;	
 	return ret;
 }
 
 string binaryOperator(SymbolInfoPtr info1, string oprtr, SymbolInfoPtr info2) {
-	string ret;
+	string ret = "int";	// default to skip redundant errors
 	if (oprtr=="%") {
 		if (!info1->isInt() || !info2->isInt()) {
 			showError("Non-Integer operand on modulus operator");
 		}
-		ret = "int";
 	} else {
 		if (info1->isVoid() || info2->isVoid()) {
 			//errorout << info1->getName() << ", " << info2->getName() << "\n";
 			showError("Type mismatch : void in expression");
 		} else {
+			info1->getVariableType();
 			if (oprtr == "=" && info1->getVariableType() != info2->getVariableType()) {
 				showError("Type mismatch");
 			}
@@ -87,11 +93,15 @@ void insertVarToTable(Variable var) {
 }
 
 void handleFunctionDefinition(SymbolInfoPtr type, SymbolInfoPtr id) {
-	table->enterScope(); 	/// needs global treatment
 	SymbolInfoPtr inside = table->lookUp(id->getName());
 	if (inside == nullptr) {
 		///function was not declared
 		table->insert(id->getName(), id->getType());
+	}
+	scopeCreated =  true;
+	table->enterScope(); 	/// needs global treatment
+	if (inside == nullptr) {
+		///function was not declared
 		inside = table->lookUp(id->getName());
 		inside->setFunction();
 		
@@ -161,7 +171,7 @@ SymbolInfo* info;
 %token NOT LPAREN RPAREN LCURL RCURL LTHIRD RTHIRD COMMA SEMICOLON
 %token ADDOP MULOP INCOP DECOP RELOP ASSIGNOP LOGICOP BITOP
 %token CONST_INT CONST_FLOAT CONST_CHAR
-%token ID INT FLOAT 
+%token ID INT FLOAT
 
 %left ADDOP 
 %left MULOP
@@ -171,6 +181,7 @@ SymbolInfo* info;
 
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE
+%error-verbose
 
 %start start
 //%start expression_statement
@@ -274,20 +285,22 @@ parameter_list  : parameter_list COMMA type_specifier ID {
  		;
 
  		
-compound_statement : LCURL { table->enterScope(); } statements RCURL {
+compound_statement : LCURL { if (!scopeCreated) table->enterScope();
+				scopeCreated = false;
+			} statements RCURL {
 			$<info>$ = handleRule("compound_statement", 
 			"LCURL statements RCURL", 
 			"{\n" + indentate($<info>3->getName()) + "}" + "\n");
-			table->printAllScopeTable(logout);	
-			//table->printAllScopeTable(cout);
+			table->printAllScopeTable(logout);
 			table->exitScope();
 		}
- 		| LCURL { table->enterScope(); } RCURL {
+ 		| LCURL { if (!scopeCreated) table->enterScope();
+				scopeCreated = false;
+			} RCURL {
 			$<info>$ = handleRule("compound_statement", 
 			"LCURL RCURL", 
 			"{}");
 			table->printAllScopeTable(logout);
-			//table->printAllScopeTable(cout);
 			table->exitScope();
 		}
  		;
@@ -437,6 +450,7 @@ variable : ID {
 			$<info>$ = handleRule("variable", "ID", $<info>1->getName());
 
 			SymbolInfoPtr sip = table->lookUp($<info>1->getName());
+			$<info>$->setVariableType("int");
 			if (sip==nullptr) {
 				showError("Undeclared Variable: " + $<info>1->getName());
 			} else {
@@ -454,6 +468,7 @@ variable : ID {
 			$<info>$ = handleRule("variable", "ID LTHIRD expression RTHIRD",
 			$<info>1->getName() + "[" + $<info>3->getName() + "]");
 
+			$<info>$->setVariableType("int");
 			SymbolInfoPtr sip = table->lookUp($<info>1->getName());
 			if (sip==nullptr) {
 				showError("Undeclared Array: " + $<info>1->getName());
@@ -551,16 +566,13 @@ unary_expression : ADDOP unary_expression {
 			$<info>$ = handleRule("unary_expression", 
 			"ADDOP unary_expression", 
 			$<info>1->getName() + $<info>2->getName());
-			/// needs attention			
-			// $<info>$->setVariableType($<info>1->getVariableType());	
+			$<info>$->setVariableType($<info>2->getVariableType());	
 		}
 		| NOT unary_expression {
 			$<info>$ = handleRule("unary_expression", 
 			"NOT unary_expression", 
 			"!" + $<info>2->getName());
-			$<info>$->setVariableType($<info>1->getVariableType());
-			/// needs attention			
-			// $<info>$->setVariableType($<info>1->getVariableType());	
+			$<info>$->setVariableType("int");
 		}
 		| factor {
 			$<info>$ = handleRule("unary_expression", 
@@ -582,16 +594,31 @@ factor	: variable {
 			$<info>1->getName() + "(" + 
 			$<info>3->getName() + ")");
 			
-			/// needs attention
-			$<info>$->setVariableType("void");
+			$<info>$->setVariableType("int");	/// default to skip redundant errors
 			SymbolInfoPtr sip = table->lookUp($<info>1->getName());
 			if (sip==nullptr) {
 				showError("Undeclared Function: " + $<info>1->getName());
-			} else if (!sip->isFunction()) {
-				showError("Declared " + $<info>1->getName() + " is not a function");
 			} else {
-				$<info>$->setVariableType(sip->getVariableType());	
+				$<info>$->setVariableType(sip->getVariableType());
+				if (!sip->isFunction()) {
+					showError("Declared " + $<info>1->getName() + " is not a function");
+				} else {
+					FunctionInfoPtr fip = sip->getFunctionInfo();
+					$<info>$->setVariableType(fip->returnType);
+					if (argTypes.size() != fip->parameters.size()) {
+						showError("Argument list size doesn't match parameter list");
+					} else {
+						for (int i = 0; i < argTypes.size(); i++) {
+							argTypes[i] = convert(argTypes[i], fip->parameters[i].type);
+							if (fip->parameters[i].type != argTypes[i]) {
+								showError("Type mismatch for parameter: " + 
+								fip->parameters[i].id);								
+							}
+						}
+					}
+				}
 			}
+			argTypes.clear();
 		}
 		| LPAREN expression RPAREN {
 			$<info>$ = handleRule("factor", 
@@ -637,11 +664,13 @@ arguments : arguments COMMA logic_expression {
 			$<info>$ = handleRule("arguments", 
 			"arguments COMMA logic_expression", 
 			$<info>1->getName() + "," + $<info>3->getName());
+			argTypes.push_back($<info>3->getVariableType());
 		}
 	   	| logic_expression {
 			$<info>$ = handleRule("arguments", 
 			"logic_expression", 
 			$<info>1->getName());
+			argTypes.push_back($<info>1->getVariableType());
 		}
 	  	;
  
@@ -656,16 +685,20 @@ int main(int argc,char *argv[])
 		exit(1);
 	}
 
-
 	logout.open("log.txt");
 	errorout.open("error.txt");
 
 	yyin=fin;
 
-	table = new SymbolTable(5);
+	table = new SymbolTable(10);
 	table->enterScope();
 	yyparse();
-	
+	table->printAllScopeTable(logout);
+
+	logout << "Total Lines: " << line_count << "\n\n";
+	logout << "Total Errors: " << error_count << "\n";
+	errorout << "Total Errors: " << error_count << "\n";
+
 	delete table;
 	fclose(fin);
 	logout.close();

@@ -4,15 +4,12 @@ int func(int a){
 
 int main(){
 	int a[2],c,i,j ; float c;
-	float d;
 	a[2.5]=1;
 	i=2.3;
 	j=2%3.7;
-	i * d;
 	a=4;
-	func(a, c);
+	func(a);
 	b=8;
-	X[0]=2.3;
-	void u, v;
 	return 0;
 }
+

@@ -9,10 +9,6 @@ using namespace std;
 
 void yyerror(char *);
 
-/// Symbol Table Implementation Ends
-
-SymbolTable stable(5);
-
 int line_count = 1, tmp_line_count;
 int error_count = 0;
 string tokenString, logString;
